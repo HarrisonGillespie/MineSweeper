@@ -5,7 +5,7 @@
 #include "Cell.h"
 
 int main()
-{
+{   
     // Initialize object containing current settings
     Board board;
 
@@ -37,7 +37,12 @@ int main()
             }
             else if (event.type == sf::Event::KeyReleased) {
                 if (event.key.code == sf::Keyboard::Escape) {
-                    board.revealBoard();
+                    if (!board.getGameOver()) {
+                        board.revealBoard();
+                    }
+                    else {
+                        board.resetBoard();
+                    }
                 }
             }
         }
@@ -47,6 +52,13 @@ int main()
 
         // Highlight cell the mouse is currently hovering over 
         board.highlightCell(window, mousePosX, mousePosY);
+
+        // End game logic
+        board.setCellsRevealed();
+        if (board.getCellsRevealed() == 320) {
+            board.revealBoard();
+            board.toggleGameOver();
+        }
 
         // Disply window
         window.display();

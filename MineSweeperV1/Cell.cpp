@@ -7,6 +7,7 @@ Cell::Cell()
 	isFlagged = 0;
 	minesAround = 0;
 	minesAroundRevealed = 0;
+	clickable = 1;
 }
 
 void Cell::setMine()
@@ -17,6 +18,11 @@ void Cell::setMine()
 void Cell::setClicked()
 {
 	isClicked = 1;
+}
+
+void Cell::setClickable()
+{
+	clickable = 0;
 }
 
 void Cell::toggleFlagged()
@@ -37,6 +43,11 @@ void Cell::setAroundRevealed()
 bool Cell::getClicked()
 {
 	return isClicked;
+}
+
+bool Cell::getClickable()
+{
+	return clickable;
 }
 
 bool Cell::getMine()

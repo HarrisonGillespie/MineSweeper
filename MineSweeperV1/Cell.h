@@ -10,12 +10,14 @@ public:
 	// Member Set Functions
 	void setMine();
 	void setClicked();
+	void setClickable();
 	void toggleFlagged();
 	void setMinesAround(unsigned a);
 	void setAroundRevealed();
 
 	// Member Output Functions
 	bool getClicked();
+	bool getClickable();
 	bool getMine();
 	bool getFlagged();
 	bool getAroundRevealed();
@@ -26,6 +28,7 @@ private:
 	bool isMine;
 	bool isFlagged;
 	bool minesAroundRevealed;
+	bool clickable;
 	unsigned minesAround;
 };
 
