@@ -116,6 +116,7 @@ void Board::findMinesAroundCell(int row, int col)
 	if (!gameBoard[row][col].getMine()) {
 		for (int i = -1; i <= 1; i++) {
 			for (int j = -1; j <= 1; j++) {
+				// Checking for out of bounds
 				if ((i == 0 && j == 0) || (i + row < 0 || j + col < 0 || i + row == ROWS || j + col == COLUMNS)) {
 					continue;
 				}
