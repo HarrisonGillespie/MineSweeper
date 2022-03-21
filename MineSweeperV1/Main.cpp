@@ -35,14 +35,20 @@ int main()
                     board.onClickRight(mousePosX, mousePosY);
                 }
             }
+            else if (event.type == sf::Event::KeyReleased) {
+                if (event.key.code == sf::Keyboard::Escape) {
+                    board.revealBoard();
+                }
+            }
         }
         
-        // Drawing the board (Will be replaced later)
+        // Drawing the board 
         board.drawBoard(window);
 
-        // Highlight cell the mouse is currently hovering over (Keep maybe??? -- Possibly replace in the board class)
+        // Highlight cell the mouse is currently hovering over 
         board.highlightCell(window, mousePosX, mousePosY);
 
+        // Disply window
         window.display();
     }
 

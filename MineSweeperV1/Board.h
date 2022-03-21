@@ -14,6 +14,10 @@ public:
 	void onClickRight(unsigned x, unsigned y);
 	void drawBoard(sf::RenderWindow& window);
 	void highlightCell(sf::RenderWindow& window, unsigned x, unsigned y);
+	void findMinesAroundCell(int row, int col);
+	void setAllMinesAround();
+	void revealCellsAround(int row, int col);
+	void revealBoard();
 	
 	unsigned getCol();
 	unsigned getRow();
@@ -29,5 +33,6 @@ private:
 	unsigned ROWS;
 	unsigned CELLSIZE;
 	unsigned NUMBOMBS;
+	bool revealed;
 };
 
