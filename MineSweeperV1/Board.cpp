@@ -14,11 +14,13 @@ Board::Board()
 	COLUMNS = 20;
 	ROWS = 20;
 	CELLSIZE = 50;
-	NUMBOMBS = 80;
+	NUMBOMBS = 99;
 	cellsRevealed = 0;
 	revealed = 0;
-	firstClick = 0;
+	firstClick = 1;
 	gameOver = 0;
+	clockTime = 0;
+	outputClockTime = 0;
 
 	// Setup font and text Settings
 	size_t len = LcdSolid_VPzB_ttf_size;
@@ -33,35 +35,39 @@ Board::Board()
 
 	// Initialzie board
 	gameBoard.resize(ROWS,std::vector<Cell>(COLUMNS,Cell()));
-
-	// PopulateMines
-	populateMines();
-	
-	// Find the mines around each cell
-	setAllMinesAround();
 }
 
-void Board::populateMines()
+void Board::populateMines(unsigned x, unsigned y)
 {
 	std::default_random_engine gen(std::chrono::steady_clock::now().time_since_epoch().count());
-	std::uniform_int_distribution<unsigned> x(0, COLUMNS - 1);
-	std::uniform_int_distribution<unsigned> y(0, ROWS - 1);
+	std::uniform_int_distribution<unsigned> xR(0, COLUMNS - 1);
+	std::uniform_int_distribution<unsigned> yR(0, ROWS - 1);
+
+	// DEBUG: std::cout << "ROW: " << y << " COL: " << x << std::endl;
 
 	for (unsigned i = 0; i < NUMBOMBS; i++) {
-		unsigned col = x(gen);
-		unsigned row = y(gen);
-		if (gameBoard[row][col].getMine()) {
+		unsigned col = xR(gen);
+		unsigned row = yR(gen);
+		if (gameBoard[row][col].getMine() || isAround(y,x,row,col) || (row == y && col == x)) {
 			i--;
 		}
 		else {
 			gameBoard[row][col].setMine();
 		}
 	}
+
+	setAllMinesAround();
 }
 
 void Board::onClickLeft(unsigned x, unsigned y)
 {
 	// Event Handling
+	if (getFirstClick()) {
+		populateMines(x, y);
+		firstClick = 0;
+		clock.restart();
+	}
+
 	if (!gameBoard[y][x].getClicked() && gameBoard[y][x].getClickable()) {
 		if (!gameBoard[y][x].getFlagged()) {
 			gameBoard[y][x].setClicked();
@@ -73,10 +79,6 @@ void Board::onClickLeft(unsigned x, unsigned y)
 			}
 		}
 	}
-	// Testing end game func -- Later incorporate into a check end game function
-	if (getCellsRevealed() == (ROWS * COLUMNS) - NUMBOMBS) {
-		revealBoard();
-	}
 }
 
 void Board::onClickRight(unsigned x, unsigned y)
@@ -85,10 +87,10 @@ void Board::onClickRight(unsigned x, unsigned y)
 	if (!gameBoard[y][x].getClicked()) {
 		gameBoard[y][x].toggleFlagged();
 		if (gameBoard[y][x].getMine()) {
-			std::cout << "MINE" << std::endl;
+			// DEBUG: std::cout << "MINE" << std::endl;
 		}
 		else {
-			std::cout << gameBoard[y][x].getMinesAround() << std::endl;
+			// DEBUG: std::cout << gameBoard[y][x].getMinesAround() << std::endl;
 		}
 	}
 }
@@ -174,6 +176,18 @@ void Board::drawText(sf::RenderWindow& window, unsigned row, unsigned col)
 	text.setPosition(18 + (CELLSIZE * col), 11 + (CELLSIZE * row));
 	window.draw(text);
 }
+
+void Board::getClockTime()
+{
+	time = clock.getElapsedTime();
+	if (!firstClick && !gameOver) {
+		clockTime = static_cast<int>(time.asSeconds());
+	}
+	if (clockTime != outputClockTime) {
+		outputClockTime = clockTime;
+		std::cout << "Current game time: " << outputClockTime << " seconds" << std::endl;
+	}
+} 
 
 void Board::highlightCell(sf::RenderWindow& window, unsigned x, unsigned y)
 {
@@ -264,17 +278,31 @@ void Board::resetBoard()
 {
 	gameBoard.clear();
 	gameBoard.resize(ROWS, std::vector<Cell>(COLUMNS, Cell()));
-	populateMines();
-	setAllMinesAround();
-	firstClick = 0;
+	revealed = 0;
+	firstClick = 1;
 	cellsRevealed = 0;
-
-	toggleGameOver();
+	gameOver = 0;
 }
 
-void Board::toggleGameOver()
+void Board::setGameOver()
 {
-	gameOver = !gameOver;
+	gameOver = 1;
+}
+
+bool Board::isAround(/*First Click Cell*/int row, int col, /*Cell to check if around*/int row2, int col2)
+{
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			// Checking for out of bounds
+			if ((i == 0 && j == 0) || (i + row2 < 0 || j + col2 < 0 || i + row2 == ROWS || j + col2 == COLUMNS)) {
+				continue;
+			}
+			else if((row == row2 + i) && (col == col2 + j)) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 unsigned Board::getCol()

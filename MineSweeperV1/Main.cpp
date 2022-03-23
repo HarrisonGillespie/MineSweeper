@@ -11,7 +11,7 @@ int main()
 
     // Setup SFML Window
     sf::RenderWindow window(sf::VideoMode(1001, 1001), "MineSweeper", sf::Style::Close);
-    window.setFramerateLimit(144);
+    window.setFramerateLimit(60);
 
     while (window.isOpen())
     {
@@ -53,12 +53,15 @@ int main()
         // Highlight cell the mouse is currently hovering over 
         board.highlightCell(window, mousePosX, mousePosY);
 
-        // End game logic
-        board.setCellsRevealed();
-        if (board.getCellsRevealed() == 320) {
+        // Game logic
+        board.setCellsRevealed(); // Each iteration check for more revealed cells
+        if (board.getCellsRevealed() >= ((board.getCol() * board.getRow()) - board.getNumBombs())) { // Greater than or equal to for debug purposes
             board.revealBoard();
-            board.toggleGameOver();
+            board.setGameOver();
         }
+
+        // Clock stuff
+        board.getClockTime();
 
         // Disply window
         window.display();
