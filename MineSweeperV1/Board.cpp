@@ -10,44 +10,97 @@
 // Default constructor for new Board object
 Board::Board()
 {
-	// Set defualt board settings
+	// Default Board Parameters
 	COLUMNS = 20;
 	ROWS = 20;
-	CELLSIZE = 50;
 	NUMBOMBS = 99;
+	menuPad = 1;
+	isFlagged = 0;
 	cellsRevealed = 0;
 	revealed = 0;
 	firstClick = 1;
 	gameOver = 0;
 	clockTime = 0;
-	outputClockTime = 0;
+	displayMenu = 0;
+	errorMenu = 0;
+
+	// Algorithm to find cell size from window size and rows/columns
+	windowHeight = (0.90f * windowHeight);
+	windowHeight -= (windowHeight % 100);
+	CELLSIZE = windowHeight / ROWS; // Integer Divison to truncate
+	windowHeight = (CELLSIZE * (ROWS + menuPad)) + 1; // Re-multiply in case value was truncated, adding 1 for the black outline
+	windowWidth = (CELLSIZE * COLUMNS) + 1; // Adding 1 for the black outline
+
+	// Create the window
+	window.create(sf::VideoMode(windowWidth, windowHeight), "MineSweeper", sf::Style::Close);
+	window.setFramerateLimit(60);
 
 	// Setup font and text Settings
 	size_t len = LcdSolid_VPzB_ttf_size;
 	void* data = LcdSolid_VPzB_ttf;
 
-	if (!font.loadFromMemory(data,len)) {
-		std::cout << "Error loading font" << std::endl;
-	}
-	text.setFont(font);
-	text.setCharacterSize(25);
-	text.setFillColor(sf::Color::Black);
+	font.loadFromMemory(data, len);
+
+	cellText.setFont(font);
+	cellText.setCharacterSize(CELLSIZE * 0.5f);
+	// cellText.setOrigin(CELLSIZE / 4.0f, CELLSIZE / 4.0f);
+	cellText.setFillColor(sf::Color::Black);
+
+	clockText.setFont(font);
+	clockText.setCharacterSize(CELLSIZE);
+	clockText.setFillColor(sf::Color::Red);
+	clockText.setString("000");
+
+	bombText.setFont(font);
+	bombText.setCharacterSize(CELLSIZE);
+	bombText.setFillColor(sf::Color::Red);
+	bombText.setPosition(0 + (window.getSize().x * 0.05f), 0);
+	bombText.setString("099");
+
+	smiley.setFont(font);
+	smiley.setCharacterSize(CELLSIZE * 0.6f);
+	smiley.setFillColor(sf::Color::Black);
+	smiley.setString(":|");
+	smiley.setOrigin((CELLSIZE * 0.6f) * 0.5f, (CELLSIZE * 0.6f) * 0.5f);
+	smiley.rotate(90);
+	smiley.scale(1,1.1);
+
+	// Setup Shapes
+	cellShape.setSize(sf::Vector2f(CELLSIZE - 1, CELLSIZE - 1));
+
+	flagShape.setSize(sf::Vector2f((CELLSIZE / 2), (CELLSIZE / 2)));
+	flagShape.setOrigin(sf::Vector2f((CELLSIZE / 4), (CELLSIZE / 4)));
+	flagShape.rotate(45);
+	flagShape.setFillColor(sf::Color::Red);
+
+	smileyBackground.setRadius((CELLSIZE - 9) / 2.0f);
+	smileyBackground.setOrigin((CELLSIZE - 9) / 2.0f, 0);
+	smileyBackground.setFillColor(sf::Color::Yellow);
 
 	// Initialzie board
 	gameBoard.resize(ROWS,std::vector<Cell>(COLUMNS,Cell()));
 }
 
-void Board::populateMines(unsigned x, unsigned y)
+void Board::checkGameOver()
+{
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLUMNS; j++) {
+			if (gameBoard[i][j].getClicked() && gameBoard[i][j].getMine()) {
+				setGameOver();
+			}
+		}
+	}
+}
+
+void Board::populateMines(int x, int y)
 {
 	std::default_random_engine gen(std::chrono::steady_clock::now().time_since_epoch().count());
-	std::uniform_int_distribution<unsigned> xR(0, COLUMNS - 1);
-	std::uniform_int_distribution<unsigned> yR(0, ROWS - 1);
+	std::uniform_int_distribution<int> xR(0, COLUMNS - 1);
+	std::uniform_int_distribution<int> yR(0, ROWS - 1);
 
-	// DEBUG: std::cout << "ROW: " << y << " COL: " << x << std::endl;
-
-	for (unsigned i = 0; i < NUMBOMBS; i++) {
-		unsigned col = xR(gen);
-		unsigned row = yR(gen);
+	for (int i = 0; i < NUMBOMBS; i++) {
+		int col = xR(gen);
+		int row = yR(gen);
 		if (gameBoard[row][col].getMine() || isAround(y,x,row,col) || (row == y && col == x)) {
 			i--;
 		}
@@ -59,59 +112,81 @@ void Board::populateMines(unsigned x, unsigned y)
 	setAllMinesAround();
 }
 
-void Board::onClickLeft(unsigned x, unsigned y)
+void Board::onClickLeft(int x, int y)
 {
+	int relativeY = y - menuPad;
 	// Event Handling
-	if (getFirstClick()) {
-		populateMines(x, y);
-		firstClick = 0;
-		clock.restart();
-	}
 
-	if (!gameBoard[y][x].getClicked() && gameBoard[y][x].getClickable()) {
-		if (!gameBoard[y][x].getFlagged()) {
-			gameBoard[y][x].setClicked();
-			if (gameBoard[y][x].getMinesAround() == 0 && !gameBoard[y][x].getMine()) {
-				revealCellsAround(y,x);
+		// Menu
+	if (y == 0) {
+		; // Nothing for now
+	}
+		// Board
+	else if(!displayMenu) {
+		if (getFirstClick()) {
+			populateMines(x, relativeY);
+			smiley.setString(":)");
+			firstClick = 0;
+			clockTime = 0;
+			clock.restart();
+		}
+
+		if (!gameBoard[relativeY][x].getClicked() && gameBoard[relativeY][x].getClickable()) {
+			if (!gameBoard[relativeY][x].getFlagged()) {
+				gameBoard[relativeY][x].setClicked();
+				if (gameBoard[relativeY][x].getMinesAround() == 0 && !gameBoard[relativeY][x].getMine()) {
+					revealCellsAround(relativeY, x);
+				}
 			}
-			else if (gameBoard[y][x].getMine()) {
-				revealBoard();
+		}
+		else if (gameBoard[relativeY][x].getClicked() && gameBoard[relativeY][x].getClickable() && !gameBoard[relativeY][x].getMine()) {
+			if (isAroundFlagged(relativeY, x) >= gameBoard[relativeY][x].getMinesAround()) {
+				revealAroundNotFlagged(relativeY, x);
 			}
 		}
 	}
+
+	checkGameOver();
 }
 
-void Board::onClickRight(unsigned x, unsigned y)
+void Board::onClickRight(int x, int y)
 {
+	int relativeY = y - menuPad;
 	// Event handling
-	if (!gameBoard[y][x].getClicked()) {
-		gameBoard[y][x].toggleFlagged();
-		if (gameBoard[y][x].getMine()) {
-			// DEBUG: std::cout << "MINE" << std::endl;
-		}
-		else {
-			// DEBUG: std::cout << gameBoard[y][x].getMinesAround() << std::endl;
+
+	if (y == 0) {
+		; // Nothing for now
+	}
+	else if (!displayMenu) {
+		if (!getFirstClick()) {
+			if (!gameBoard[relativeY][x].getClicked() && !gameOver) {
+				gameBoard[relativeY][x].toggleFlagged();
+				if (gameBoard[relativeY][x].getMine()) {
+					// DEBUG: std::cout << "MINE" << std::endl;
+				}
+				else {
+					// DEBUG: std::cout << gameBoard[y][x].getMinesAround() << std::endl;
+				}
+			}
+			else if (gameBoard[relativeY][x].getClicked() && gameBoard[relativeY][x].getClickable() && !gameBoard[relativeY][x].getMine()) {
+				if (isAroundNotClicked(relativeY, x) == gameBoard[relativeY][x].getMinesAround()) {
+					flagAround(relativeY, x);
+				}
+			}
 		}
 	}
 }
 
 void Board::drawBoard(sf::RenderWindow& window)
 {
-	// Cell Shape
-	sf::RectangleShape cellShape(sf::Vector2f(CELLSIZE - 1, CELLSIZE - 1));
-	// "Flag" Shape
-	sf::RectangleShape flagShape(sf::Vector2f((CELLSIZE / 2), (CELLSIZE / 2)));
-	flagShape.rotate(45);
-	flagShape.setFillColor(sf::Color::Magenta);
-
 	// Clear the window
 	window.clear(sf::Color::Black);
 
 	// Draw the board
 	for (unsigned i = 0; i < ROWS; i++) {
 		for (unsigned j = 0; j < COLUMNS; j++) {
-			cellShape.setPosition(1 + CELLSIZE * j, 1 + CELLSIZE * i);
-			flagShape.setPosition((CELLSIZE * j) + 26, (CELLSIZE * i) + 8);
+			cellShape.setPosition(1 + CELLSIZE * j, (1 + CELLSIZE * i) + CELLSIZE);
+			flagShape.setPosition((CELLSIZE * j) + (CELLSIZE * 0.5f), (CELLSIZE * i) + (CELLSIZE * 1.5f));
 			// Draw Cell
 			if (!gameBoard[i][j].getClicked()) {
 				cellShape.setFillColor(sf::Color(192, 192, 192));
@@ -137,65 +212,100 @@ void Board::drawBoard(sf::RenderWindow& window)
 			/*if (!gameBoard[i][j].getMine()) {
 				drawText(window, i, j);
 			}*/
+
+			// Draw Bomb Counter
+			getAllFlagged();
+			if (NUMBOMBS - isFlagged < 0) {
+				if (std::to_string(isFlagged - NUMBOMBS).size() < 3) {
+					bombText.setString((std::to_string(isFlagged - NUMBOMBS).insert(0, 2 - std::to_string(isFlagged - NUMBOMBS).size(), '0')).insert(0,1,'-'));
+				}
+			}
+			else {
+				if (std::to_string(NUMBOMBS - isFlagged).size() < 3) {
+					bombText.setString(std::to_string(NUMBOMBS - isFlagged).insert(0, 3 - std::to_string(NUMBOMBS - isFlagged).size(), '0'));
+				}
+				else {
+					bombText.setString(std::to_string(NUMBOMBS - isFlagged));
+				}
+			}
+			// std::cout << NUMBOMBS << std::endl;
+			window.draw(bombText);
+			
+			// Draw Smiley Face
+			smiley.setPosition((window.getSize().x / 2.0f) + 2, CELLSIZE * 0.4f);
+			smileyBackground.setPosition(window.getSize().x / 2.0f, 5);
+			window.draw(smileyBackground);
+			window.draw(smiley);
 		}
 	}
 }
 
-void Board::drawText(sf::RenderWindow& window, unsigned row, unsigned col)
+void Board::drawText(sf::RenderWindow& window, int row, int col)
 {
-	text.setString(std::to_string(gameBoard[row][col].getMinesAround()));
+	cellText.setString(std::to_string(gameBoard[row][col].getMinesAround()));
 	switch (gameBoard[row][col].getMinesAround()) {
 	case 0:
-		text.setFillColor(sf::Color::White);
+		cellText.setFillColor(sf::Color::White);
 		break;
 	case 1: 
-		text.setFillColor(sf::Color::Blue);
+		cellText.setFillColor(sf::Color::Blue);
 		break;
 	case 2:
-		text.setFillColor(sf::Color::Green);
+		cellText.setFillColor(sf::Color::Green);
 		break;
 	case 3:
-		text.setFillColor(sf::Color::Red);
+		cellText.setFillColor(sf::Color::Red);
 		break;
 	case 4:
-		text.setFillColor(sf::Color(0, 0, 139));
+		cellText.setFillColor(sf::Color(0, 0, 139));
 		break;
 	case 5:
-		text.setFillColor(sf::Color(165, 42, 42));
+		cellText.setFillColor(sf::Color(165, 42, 42));
 		break;
 	case 6:
-		text.setFillColor(sf::Color::Cyan);
+		cellText.setFillColor(sf::Color::Cyan);
 		break;
 	case 7:
-		text.setFillColor(sf::Color::Black);
+		cellText.setFillColor(sf::Color::Black);
 		break;
 	case 8:
-		text.setFillColor(sf::Color::Yellow);
+		cellText.setFillColor(sf::Color::Yellow);
 		break;
 	}
-	text.setPosition(18 + (CELLSIZE * col), 11 + (CELLSIZE * row));
-	window.draw(text);
+	cellText.setPosition((CELLSIZE * (col + 0.4f)) - 2, (CELLSIZE * row) + (CELLSIZE * 1.2f));
+	window.draw(cellText);
 }
 
-void Board::getClockTime()
+void Board::getClockTime(sf::RenderWindow& window)
 {
 	time = clock.getElapsedTime();
+	clockText.setPosition(0 + (window.getSize().x * 0.85f), 0);
 	if (!firstClick && !gameOver) {
+		clockText.setFillColor(sf::Color::Green);
 		clockTime = static_cast<int>(time.asSeconds());
+		if (std::to_string(clockTime).size() < 3) {
+			clockText.setString(std::to_string(clockTime).insert(0, 3 - std::to_string(clockTime).size(), '0'));
+		}
+		else {
+			clockText.setString(std::to_string(clockTime));
+		}
+		// DEBUG: std::cout << clockOut << std::endl;
 	}
-	if (clockTime != outputClockTime) {
-		outputClockTime = clockTime;
-		std::cout << "Current game time: " << outputClockTime << " seconds" << std::endl;
+	else {
+		clockText.setFillColor(sf::Color::Red);
 	}
-} 
 
-void Board::highlightCell(sf::RenderWindow& window, unsigned x, unsigned y)
+	window.draw(clockText);
+}
+
+void Board::highlightCell(sf::RenderWindow& window, int x, int y)
 {
 	// Highlight cell the mouse is currently hovering over
-	sf::RectangleShape cellShape(sf::Vector2f(CELLSIZE - 1, CELLSIZE - 1));
-	cellShape.setPosition(1 + (CELLSIZE * x), 1 + (CELLSIZE * y));
-	cellShape.setFillColor(sf::Color::Blue);
-	window.draw(cellShape);
+	if (x < COLUMNS && y > 0 && y < ROWS + menuPad) {
+		cellShape.setPosition(1 + (CELLSIZE * x), 1 + (CELLSIZE * y));
+		cellShape.setFillColor(sf::Color::Blue);
+		window.draw(cellShape);
+	}
 }
 
 void Board::findMinesAroundCell(int row, int col)
@@ -247,6 +357,23 @@ void Board::revealCellsAround(int row, int col)
 	}
 }
 
+void Board::revealAroundNotFlagged(int row, int col)
+{
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			// Checking for out of bounds
+			if ((i == 0 && j == 0) || (i + row < 0 || j + col < 0 || i + row == ROWS || j + col == COLUMNS)) {
+				continue;
+			}
+			else if(!gameBoard[row + i][col + j].getFlagged()) {
+				gameBoard[row + i][col + j].setClicked();
+				if ((gameBoard[row + i][col + j].getMinesAround() == 0) && !gameBoard[row + i][col + j].getMine()) revealCellsAround(row + i, col + j);
+				checkGameOver();
+			}
+		}
+	}
+}
+
 void Board::revealBoard()
 {
 	for (int i = 0; i < ROWS; i++) {
@@ -280,13 +407,28 @@ void Board::resetBoard()
 	gameBoard.resize(ROWS, std::vector<Cell>(COLUMNS, Cell()));
 	revealed = 0;
 	firstClick = 1;
+	isFlagged = 0;
+	clockText.setString("000");
+	smiley.setString(":|");
+	bombText.setFillColor(sf::Color::Red);
 	cellsRevealed = 0;
 	gameOver = 0;
+	displayMenu = 0;
+}
+
+void Board::setGameWon()
+{
+	gameOver = 1;
+	smiley.setString(":D");
+	bombText.setString("000");
+	bombText.setFillColor(sf::Color::Green);
 }
 
 void Board::setGameOver()
 {
 	gameOver = 1;
+	smiley.setString(":(");
+	revealBoard();
 }
 
 bool Board::isAround(/*First Click Cell*/int row, int col, /*Cell to check if around*/int row2, int col2)
@@ -303,6 +445,143 @@ bool Board::isAround(/*First Click Cell*/int row, int col, /*Cell to check if ar
 		}
 	}
 	return false;
+}
+
+int Board::isAroundFlagged(int row, int col)
+{
+	int count = 0;
+
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			// Checking for out of bounds
+			if ((i == 0 && j == 0) || (i + row < 0 || j + col < 0 || i + row == ROWS || j + col == COLUMNS)) {
+				continue;
+			}
+			else if (gameBoard[row + i][col + j].getFlagged()) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+int Board::isAroundNotClicked(int row, int col)
+{
+	int count = 0;
+
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			// Checking for out of bounds
+			if ((i == 0 && j == 0) || (i + row < 0 || j + col < 0 || i + row == ROWS || j + col == COLUMNS)) {
+				continue;
+			}
+			else if (!gameBoard[row + i][col + j].getClicked()) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+void Board::flagAround(int row, int col)
+{
+	for (int i = -1; i <= 1; i++) {
+		for (int j = -1; j <= 1; j++) {
+			// Checking for out of bounds
+			if ((i == 0 && j == 0) || (i + row < 0 || j + col < 0 || i + row == ROWS || j + col == COLUMNS)) {
+				continue;
+			}
+			else if (!gameBoard[row + i][col + j].getFlagged() && !gameBoard[row + i][col + j].getClicked()) {
+				gameBoard[row + i][col + j].toggleFlagged();
+			}
+		}
+	}
+}
+
+void Board::getAllFlagged()
+{
+	int totalFlagged = 0;
+
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLUMNS; j++) {
+			if (gameBoard[i][j].getFlagged()) {
+				totalFlagged++;
+			}
+		}
+	}
+	
+	isFlagged = totalFlagged;
+}
+
+void Board::toggleMenu()
+{
+	displayMenu = !displayMenu;
+}
+
+void Board::toggleError()
+{
+	errorMenu = !errorMenu;
+}
+
+void Board::openMenu()
+{
+	displayMenu = 1;
+}
+
+void Board::closeMenu()
+{
+	displayMenu = 0;
+}
+
+void Board::resizeBoard(int newRows, int newCols, int newBombs)
+{
+	int calcCellsize;
+
+	if (newBombs > ((newRows * newCols) - 9)) {
+		displayMenu = 0;
+		errorMenu = 1;
+		std::cout << "Error bombs check" << std::endl;
+		return;
+	}
+
+	windowHeight = modes[0].height; 
+	windowHeight = (0.90f * windowHeight);
+	windowHeight -= (windowHeight % 100);
+	calcCellsize = windowHeight / newRows; // Integer Divison to truncate
+	windowHeight = (calcCellsize * (newRows + menuPad)) + 1; // Re-multiply in case value was truncated, adding 1 for the black outline
+	windowWidth = (calcCellsize * newCols) + 1; // Adding 1 for the black outline
+
+	if ((windowWidth + 1) > modes[0].width) {
+		displayMenu = 0;
+		errorMenu = 1;
+		std::cout << "Error wdith check" << std::endl;
+		std::cout << "Calc width: " << windowWidth << " Monitor width: " << window.getSize().x << std::endl;
+		return;
+	}
+
+	ROWS = newRows;
+	COLUMNS = newCols;
+	NUMBOMBS = newBombs;
+	CELLSIZE = calcCellsize;
+
+	window.setSize(sf::Vector2u(windowWidth,windowHeight));
+	window.setView(sf::View(sf::FloatRect(0,0,windowWidth,windowHeight)));
+	window.setPosition(sf::Vector2i((modes[0].width / 2) - (window.getSize().x / 2), (modes[0].height / 2) - (window.getSize().y / 2)));
+
+	cellShape.setSize(sf::Vector2f(CELLSIZE - 1, CELLSIZE - 1));
+	flagShape.setSize(sf::Vector2f((CELLSIZE / 2), (CELLSIZE / 2)));
+	flagShape.setOrigin(sf::Vector2f((CELLSIZE / 4), (CELLSIZE / 4)));
+	smileyBackground.setRadius((CELLSIZE - 9) / 2.0f);
+	smileyBackground.setOrigin((CELLSIZE - 9) / 2.0f, 0);
+
+	cellText.setCharacterSize(CELLSIZE / 2);
+	clockText.setCharacterSize(CELLSIZE);
+	bombText.setCharacterSize(CELLSIZE);
+	bombText.setPosition(0 + (window.getSize().x * 0.05f), 0);
+	smiley.setCharacterSize(CELLSIZE * 0.6f);
+	smiley.setOrigin((CELLSIZE * 0.6f) * 0.5f, (CELLSIZE * 0.6f) * 0.5f);
+
+	resetBoard();
 }
 
 unsigned Board::getCol()
@@ -338,4 +617,14 @@ bool Board::getFirstClick()
 bool Board::getGameOver()
 {
 	return gameOver;
+}
+
+bool Board::getDisplayMenu()
+{
+	return displayMenu;
+}
+
+bool Board::getErrorMenu()
+{
+	return errorMenu;
 }
